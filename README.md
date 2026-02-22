@@ -1,5 +1,28 @@
-🔐 Password Stress Test (v.1.0.0)CyberGuard Pro è uno strumento di analisi della sicurezza delle password sviluppato in Python utilizzando PySide6 (Qt6). L'applicazione permette di valutare la robustezza di una password non solo tramite i classici criteri (maiuscole, numeri, simboli), ma calcolandone l'entropia reale e stimando il tempo necessario per un attacco brute-force su diversi scenari hardware moderni.🚀 Caratteristiche PrincipaliAnalisi Real-Time: Valutazione immediata della robustezza durante la digitazione.Dashboard Hardware: Stima del tempo di cracking basata su potenze di calcolo reali (dal vecchio laptop ai cluster di GPU RTX 4090 fino ai computer quantistici).Generatore Sicuro: Creazione di password ad alta entropia con parametri personalizzabili (lunghezza e set di caratteri).UI Adattiva: L'interfaccia si adatta automaticamente alla risoluzione dello schermo dell'utente (occupandone il 30%) e si posiziona al centro.Privacy e Sicurezza: Utilizza il modulo secrets di Python per una generazione crittograficamente sicura e include un controllo locale per le password comuni più vulnerabili.Design Professionale: Interfaccia "Light Mode" moderna, pulita e intuitiva.🛠️ Tecnologie UtilizzateLinguaggio: Python 3.xFramework UI: PySide6 (Qt6)Logica: Regex per pattern matching, math per il calcolo dell'entropia (bit), secrets per la generazione casuale sicura.📦 Installazione e UtilizzoClona il repository:Bashgit clone https://github.com/enkas79/PSW_test.git
+🔐 Password Stress Test (v.1.0.0)CyberGuard Pro è uno strumento di analisi della sicurezza delle password sviluppato in Python utilizzando PySide6 (Qt6). 
+L'applicazione permette di valutare la robustezza di una password non solo tramite i classici criteri (maiuscole, numeri, simboli), ma calcolandone l'entropia reale e stimando il tempo necessario per un attacco brute-force su diversi scenari hardware moderni.
+🚀 Caratteristiche Principali
+Analisi Real-Time: Valutazione immediata della robustezza durante la digitazione.
+Dashboard Hardware: Stima del tempo di cracking basata su potenze di calcolo reali (dal vecchio laptop ai cluster di GPU RTX 4090 fino ai computer quantistici).
+Generatore Sicuro: Creazione di password ad alta entropia con parametri personalizzabili (lunghezza e set di caratteri).
+UI Adattiva: L'interfaccia si adatta automaticamente alla risoluzione dello schermo dell'utente (occupandone il 30%) e si posiziona al centro.
+Privacy e Sicurezza: Utilizza il modulo secrets di Python per una generazione crittograficamente sicura e include un controllo locale per le password comuni più vulnerabili.
+Design Professionale: Interfaccia "Light Mode" moderna, pulita e intuitiva.
+🛠️ Tecnologie Utilizzate
+Linguaggio: Python 3.xFramework 
+UI: PySide6 (Qt6)
+Logica: Regex per pattern matching, math per il calcolo dell'entropia (bit), secrets per la generazione casuale sicura.
+📦 Installazione e Utilizzo
+Clona il repository:Bashgit clone https://github.com/enkas79/PSW_test.git
 cd PSW_test
-Installa le dipendenze:Assicurati di avere pip aggiornato e installa PySide6:Bashpip install PySide6
-Avvia l'applicazione:Bashpython PSW_test.py
-👨‍💻 AutoreAutore: Enrico MartiniRepository: enkas79/PSW_testVersione attuale: 1.0.0📝 Note TecnicheL'applicazione calcola il tempo di cracking utilizzando la formula dell'entropia di Shannon:$$E = L \cdot \log_2(R)$$Dove $L$ è la lunghezza della stringa e $R$ è la dimensione del pool di caratteri utilizzati. I tempi di calcolo sono stimati ipotizzando un attacco brute-force diretto senza protezioni di rate limiting o hashing complesso (es. bcrypt/argon2).
+Installa le dipendenze:
+Assicurati di avere pip aggiornato e installa PySide6:
+Bash
+pip install PySide6
+Avvia l'applicazione:
+Bash
+python PSW_test.py
+👨‍💻 AutoreAutore: Enrico Martini
+Versione attuale: 1.0.0
+📝 Note Tecniche
+L'applicazione calcola il tempo di cracking utilizzando la formula dell'entropia di Shannon. 
+I tempi di calcolo sono stimati ipotizzando un attacco brute-force diretto senza protezioni di rate limiting o hashing complesso (es. bcrypt/argon2).

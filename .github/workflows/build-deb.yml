@@ -1,0 +1,57 @@
+name: Build Debian Package
+
+# Il processo parte ogni volta che fai un "push" sul ramo principale (main)
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Permette di farlo partire anche a mano
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Scarica il codice dal repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Crea la struttura delle cartelle per il pacchetto
+      - name: Create directory structure
+        run: |
+          mkdir -p psw-test-pkg/DEBIAN
+          mkdir -p psw-test-pkg/usr/local/bin
+          mkdir -p psw-test-pkg/usr/share/psw-test
+
+      # 3. Crea il file 'control' con le info del pacchetto
+      - name: Create control file
+        run: |
+          echo "Package: psw-test" > psw-test-pkg/DEBIAN/control
+          echo "Version: 1.0.${{ github.run_number }}" >> psw-test-pkg/DEBIAN/control
+          echo "Section: utils" >> psw-test-pkg/DEBIAN/control
+          echo "Priority: optional" >> psw-test-pkg/DEBIAN/control
+          echo "Architecture: all" >> psw-test-pkg/DEBIAN/control
+          echo "Maintainer: GitHub Action" >> psw-test-pkg/DEBIAN/control
+          echo "Depends: python3" >> psw-test-pkg/DEBIAN/control
+          echo "Description: Strumento di test per password." >> psw-test-pkg/DEBIAN/control
+
+      # 4. Copia i tuoi file Python nella cartella del pacchetto
+      # (Assicurati che 'psw_test.py' sia il nome corretto del file nel repo)
+      - name: Copy files
+        run: |
+          cp *.py psw-test-pkg/usr/share/psw-test/
+          
+          # Crea il lanciatore veloce
+          echo '#!/bin/bash' > psw-test-pkg/usr/local/bin/psw-test
+          echo 'python3 /usr/share/psw-test/psw_test.py "$@"' >> psw-test-pkg/usr/local/bin/psw-test
+          chmod +x psw-test-pkg/usr/local/bin/psw-test
+
+      # 5. Costruisce effettivamente il file .deb
+      - name: Build .deb package
+        run: dpkg-deb --build psw-test-pkg
+
+      # 6. Carica il file .deb su GitHub per poterlo scaricare
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: psw-test-package
+          path: psw-test-pkg.deb

@@ -3,21 +3,57 @@ import re
 import math
 import secrets
 import string
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLineEdit, QLabel, QProgressBar, 
-                             QPushButton, QSpinBox, QCheckBox, QGroupBox, 
-                             QGridLayout, QMessageBox, QMenuBar)
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+import urllib.request
+import json
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                               QHBoxLayout, QLineEdit, QLabel, QProgressBar,
+                               QPushButton, QSpinBox, QCheckBox, QGroupBox,
+                               QGridLayout, QMessageBox, QMenuBar)
+from PySide6.QtCore import Qt, QThread, Signal, QUrl
+from PySide6.QtGui import QAction, QDesktopServices
 
 # ==========================================
 # Metadati e Configurazione
 # ==========================================
-VERSION = "1.0.0"  
+VERSION = "1.0.0"
 REPO_OWNER = "enkas79"
 REPO_NAME = "PSW_test"
 AUTHOR = "Enrico Martini"
 
+
+# ==========================================
+# LOGICA DI CONTROLLO AGGIORNAMENTI (THREAD)
+# ==========================================
+class UpdateWorker(QThread):
+    """Thread separato per controllare gli aggiornamenti senza bloccare la UI."""
+    finished = Signal(bool, str)  # Segnale che invia (ha_aggiornamento, nuova_versione)
+
+    def __init__(self, owner, repo, current_version):
+        super().__init__()
+        self.owner = owner
+        self.repo = repo
+        self.current_version = current_version
+
+    def run(self):
+        try:
+            # Usiamo urllib (nativo) per non aggiungere dipendenze esterne al pacchetto
+            url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode())
+                    v = data.get('tag_name', '').replace('v', '')
+                    # Verifica se la versione online è maggiore di quella locale
+                    self.finished.emit(v > self.current_version, v)
+        except:
+            # Se non c'è internet o l'API fallisce, il programma continua normalmente
+            pass
+
+
+# ==========================================
+# FINESTRA PRINCIPALE
+# ==========================================
 class PasswordCyberDashboard(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -32,20 +68,23 @@ class PasswordCyberDashboard(QMainWindow):
 
         self.common_passwords = {"123456", "password", "12345678", "qwerty", "admin123"}
         self.labels_tempo = {}
-        
+
         self.init_ui()
         self.apply_adaptive_geometry()
         self.apply_light_styles()
         self.crea_menu()
 
+        # Avvia il controllo automatico silenzioso all'apertura del programma
+        self.controlla_aggiornamenti(silent=True)
+
     def init_ui(self):
         # Titolo dinamico usando i metadati
         self.setWindowTitle(f"Password Stress Test v.{VERSION}")
-        
+
         # Widget centrale necessario per QMainWindow
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
-        
+
         self.main_layout = QVBoxLayout(self.central_widget)
         self.main_layout.setSpacing(15)
         self.main_layout.setContentsMargins(20, 20, 20, 20)
@@ -53,7 +92,7 @@ class PasswordCyberDashboard(QMainWindow):
         # --- 1. ANALISI ---
         input_group = QGroupBox("ANALISI SICUREZZA")
         input_vbox = QVBoxLayout()
-        
+
         h_input_layout = QHBoxLayout()
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Inserisci la password...")
@@ -71,12 +110,12 @@ class PasswordCyberDashboard(QMainWindow):
         self.btn_copy.clicked.connect(self.copia_password)
         h_input_layout.addWidget(self.btn_copy)
         input_vbox.addLayout(h_input_layout)
-        
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedHeight(10)
         self.progress_bar.setTextVisible(False)
         input_vbox.addWidget(self.progress_bar)
-        
+
         self.info_label = QLabel("In attesa di input...")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         input_vbox.addWidget(self.info_label)
@@ -107,18 +146,25 @@ class PasswordCyberDashboard(QMainWindow):
         l_layout = QHBoxLayout()
         l_layout.addWidget(QLabel("Lunghezza:"))
         self.spin_length = QSpinBox()
-        self.spin_length.setRange(4, 128); self.spin_length.setValue(16)
+        self.spin_length.setRange(4, 128);
+        self.spin_length.setValue(16)
         l_layout.addWidget(self.spin_length)
         gen_vbox.addLayout(l_layout)
 
         check_grid = QGridLayout()
-        self.check_upper = QCheckBox("A-Z (Maiuscole)"); self.check_upper.setChecked(True)
-        self.check_lower = QCheckBox("a-z (Minuscole)"); self.check_lower.setChecked(True)
-        self.check_numbers = QCheckBox("0-9 (Numeri)"); self.check_numbers.setChecked(True)
-        self.check_special = QCheckBox("!@# (Speciali)"); self.check_special.setChecked(True)
-        
-        check_grid.addWidget(self.check_upper, 0, 0); check_grid.addWidget(self.check_lower, 0, 1)
-        check_grid.addWidget(self.check_numbers, 1, 0); check_grid.addWidget(self.check_special, 1, 1)
+        self.check_upper = QCheckBox("A-Z (Maiuscole)");
+        self.check_upper.setChecked(True)
+        self.check_lower = QCheckBox("a-z (Minuscole)");
+        self.check_lower.setChecked(True)
+        self.check_numbers = QCheckBox("0-9 (Numeri)");
+        self.check_numbers.setChecked(True)
+        self.check_special = QCheckBox("!@# (Speciali)");
+        self.check_special.setChecked(True)
+
+        check_grid.addWidget(self.check_upper, 0, 0);
+        check_grid.addWidget(self.check_lower, 0, 1)
+        check_grid.addWidget(self.check_numbers, 1, 0);
+        check_grid.addWidget(self.check_special, 1, 1)
         gen_vbox.addLayout(check_grid)
 
         self.btn_genera = QPushButton("GENERA PASSWORD")
@@ -137,10 +183,15 @@ class PasswordCyberDashboard(QMainWindow):
     def crea_menu(self):
         """Crea la barra dei menu con le informazioni dinamiche."""
         bar_menu = self.menuBar()
-        
+
         # Menu Aiuto
         menu_aiuto = bar_menu.addMenu("&Aiuto")
-        
+
+        # NUOVO: Azione Controllo Aggiornamenti Manuale
+        azione_update = QAction("Controlla Aggiornamenti", self)
+        azione_update.triggered.connect(lambda: self.controlla_aggiornamenti(silent=False))
+        menu_aiuto.addAction(azione_update)
+
         # Azione Info
         azione_info = QAction("Informazioni", self)
         azione_info.triggered.connect(self.mostra_info)
@@ -149,12 +200,34 @@ class PasswordCyberDashboard(QMainWindow):
     def mostra_info(self):
         """Mostra il popup con i metadati dinamici."""
         messaggio = (
-            #f"Software: {REPO_NAME}\n"
             f"Autore: {AUTHOR}\n"
             f"Versione: {VERSION}\n\n"
-            #f"Repository: github.com/{REPO_OWNER}/{REPO_NAME}"
         )
         QMessageBox.information(self, "Info Software", messaggio)
+
+    # --- NUOVO: GESTIONE AGGIORNAMENTI ---
+    def controlla_aggiornamenti(self, silent=True):
+        """Avvia il thread per cercare nuove versioni su GitHub."""
+        self.update_thread = UpdateWorker(REPO_OWNER, REPO_NAME, VERSION)
+        self.update_thread.finished.connect(
+            lambda ha_update, v_nuova: self._elabora_risultato_update(ha_update, v_nuova, silent))
+        self.update_thread.start()
+
+    def _elabora_risultato_update(self, ha_update, v_nuova, silent):
+        """Gestisce il popup e l'eventuale reindirizzamento al sito web."""
+        if ha_update:
+            risposta = QMessageBox.question(
+                self,
+                "Aggiornamento Disponibile",
+                f"È disponibile una nuova versione (v{v_nuova}).\nVuoi andare alla pagina di download?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if risposta == QMessageBox.StandardButton.Yes:
+                # Apre la tua sottopagina specifica dei download nel browser dell'utente
+                sito_download = "https://mindnetwork.vip/download.php"
+                QDesktopServices.openUrl(QUrl(sito_download))
+        elif not silent:
+            QMessageBox.information(self, "Nessun Aggiornamento", "Stai già utilizzando l'ultima versione disponibile.")
 
     def apply_adaptive_geometry(self):
         screen = QApplication.primaryScreen().availableGeometry()
@@ -198,7 +271,7 @@ class PasswordCyberDashboard(QMainWindow):
         if self.check_lower.isChecked(): pool += string.ascii_lowercase
         if self.check_numbers.isChecked(): pool += string.digits
         if self.check_special.isChecked(): pool += "!@#$%^&*()_+-=[]{}|;:,.<>?"
-        if not pool: pool = string.ascii_lowercase 
+        if not pool: pool = string.ascii_lowercase
         pwd = ''.join(secrets.choice(pool) for _ in range(self.spin_length.value()))
         self.password_input.setText(pwd)
         self.password_input.setEchoMode(QLineEdit.EchoMode.Normal)
@@ -206,12 +279,12 @@ class PasswordCyberDashboard(QMainWindow):
 
     def formatta_tempo_ibrido(self, secondi):
         if secondi < 1: return "Istantaneo"
-        if secondi < 3600: return f"{int(secondi/60)} min"
-        if secondi < 86400: return f"{int(secondi/3600)} ore"
+        if secondi < 3600: return f"{int(secondi / 60)} min"
+        if secondi < 86400: return f"{int(secondi / 3600)} ore"
         anni = secondi / 86400 / 365
-        if anni < 1: return f"{int(secondi/86400)} giorni"
+        if anni < 1: return f"{int(secondi / 86400)} giorni"
         if anni < 1_000_000: return f"{anni:,.0f} anni".replace(",", ".")
-        if anni < 1_000_000_000: return f"Circa {anni/1_000_000:.1f} mln anni"
+        if anni < 1_000_000_000: return f"Circa {anni / 1_000_000:.1f} mln anni"
         return "Eternità 🌌"
 
     def analizza_tutto(self, password):
@@ -241,6 +314,7 @@ class PasswordCyberDashboard(QMainWindow):
         color = "#e74c3c" if punteggio < 40 else "#f1c40f" if punteggio < 75 else "#2ecc71"
         self.progress_bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {color}; }}")
         self.info_label.setText(f"Entropia: {int(entropia)} bit")
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

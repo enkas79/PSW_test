@@ -1,0 +1,112 @@
+name: Build PSW_test (Windows & Linux)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'version.txt' # Il server di build partirà SOLO se modifichi questo file
+  workflow_dispatch: # Ti permette di farlo partire anche a mano da GitHub
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ==========================================
+  # JOB 1: BUILD PER WINDOWS (.exe singolo file)
+  # ==========================================
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout del codice
+      uses: actions/checkout@v4
+
+    - name: Leggi la versione da version.txt
+      shell: bash
+      run: |
+        VERSION=$(cat version.txt)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Installazione Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Installazione Librerie
+      run: |
+        python -m pip install --upgrade pip
+        pip install PySide6 pyinstaller
+
+    - name: Creazione Eseguibile Windows (PyInstaller)
+      run: |
+        pyinstaller --onefile --noconsole --name=PSW_test PSW_test.py
+
+    - name: Pubblica la Release su GitHub (Windows)
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ env.VERSION }}
+        name: Password Stress Test v${{ env.VERSION }}
+        body: "Nuovo aggiornamento di Password Stress Test rilasciato. Scarica l'eseguibile per Windows o il pacchetto per Linux!"
+        files: dist/PSW_test.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+  # ==========================================
+  # JOB 2: BUILD PER LINUX (.deb universale)
+  # ==========================================
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout del codice
+      uses: actions/checkout@v4
+
+    - name: Leggi la versione da version.txt
+      shell: bash
+      run: |
+        VERSION=$(cat version.txt)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Impacchettamento nel formato Debian (.deb)
+      shell: bash
+      run: |
+        VERSION=${{ env.VERSION }}
+        DEB_DIR="psw-test_v${VERSION}_all"
+        
+        # 1. Crea la struttura delle cartelle standard di Linux
+        mkdir -p $DEB_DIR/DEBIAN
+        mkdir -p $DEB_DIR/usr/local/bin
+        mkdir -p $DEB_DIR/usr/share/psw-test
+
+        # 2. Copia i file sorgente (Corretto il nome con le maiuscole)
+        cp PSW_test.py $DEB_DIR/usr/share/psw-test/
+
+        # 3. Crea il file 'control' per il gestore pacchetti APT
+        cat <<EOF > $DEB_DIR/DEBIAN/control
+        Package: psw-test
+        Version: ${VERSION}
+        Section: utils
+        Priority: optional
+        Architecture: all
+        Maintainer: Enrico Martini
+        Depends: python3
+        Description: Strumento grafico avanzato per testare la robustezza delle password.
+        EOF
+
+        # 4. Crea il lanciatore veloce correggendo il richiamo a PSW_test.py
+        echo '#!/bin/bash' > $DEB_DIR/usr/local/bin/psw-test
+        echo 'python3 /usr/share/psw-test/PSW_test.py "$@"' >> $DEB_DIR/usr/local/bin/psw-test
+        chmod +x $DEB_DIR/usr/local/bin/psw-test
+
+        # 5. Compila il pacchetto debian
+        dpkg-deb --build $DEB_DIR
+
+    - name: Pubblica la Release su GitHub (Linux)
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ env.VERSION }}
+        files: psw-test_v${{ env.VERSION }}_all.deb
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
